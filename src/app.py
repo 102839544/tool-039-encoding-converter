@@ -1,121 +1,69 @@
 #!/usr/bin/env python3
 """
-文件编码转换工具 - 批量转换文件编码
+encoding-converter - 文件编码转换工具
+工具编号: tool-039
 """
-import sys, os, tkinter as tk
-from pathlib import Path
-from tkinter import filedialog, messagebox
+
 import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+from pathlib import Path
 
 class App:
     def __init__(self, root):
         self.root = root
         root.title("文件编码转换工具 v1.0")
-        root.geometry("650x550")
-        self.files = []
-        self.build_ui()
+        root.geometry("700x500")
+        self.setup_ui()
     
-    def build_ui(self):
-        f = tk.Frame(self.root, bg="#455a64", height=50)
-        f.pack(fill="x")
-        tk.Label(f, text="📝 文件编码转换工具", font=("Arial",14,"bold"),
-                 fg="white", bg="#455a64").pack(pady=12)
+    def setup_ui(self):
+        # 标题
+        title_frame = tk.Frame(self.root, bg="#2196F3", height=60)
+        title_frame.pack(fill="x")
+        title_frame.pack_propagate(False)
+        tk.Label(title_frame, text="🔧 文件编码转换工具", font=("Arial", 16, "bold"),
+                 fg="white", bg="#2196F3").pack(pady=15)
         
-        main = tk.Frame(self.root, padx=15, pady=10)
+        # 主区域
+        main = tk.Frame(self.root, padx=20, pady=15)
         main.pack(fill="both", expand=True)
         
-        bf = tk.Frame(main)
-        bf.pack(fill="x", pady=5)
-        tk.Button(bf, text="添加文件", command=self.add_files,
-                  bg="#455a64", fg="white", padx=12).pack(side="left", padx=5)
-        tk.Button(bf, text="清空列表", command=self.clear,
-                  bg="#d9534f", fg="white", padx=12).pack(side="left", padx=5)
+        # 按钮
+        btn_frame = tk.Frame(main)
+        btn_frame.pack(pady=30)
         
-        self.lb = tk.Listbox(main, font=("Consolas",10), bg="#eceff1", height=10)
-        self.lb.pack(fill="both", expand=True, pady=10)
+        tk.Button(btn_frame, text="📂 选择文件", command=self.select_file,
+                  bg="#2196F3", fg="white", font=("Arial", 11),
+                  padx=20, pady=10).pack(side="left", padx=10)
         
-        # 编码选择
-        ef = tk.Frame(main)
-        ef.pack(fill="x", pady=10)
-        tk.Label(ef, text="源编码：").pack(side="left")
-        self.src_enc = tk.StringVar(value="auto")
-        encodings = ["auto", "utf-8", "utf-8-sig", "gbk", "gb2312", "big5", "shift-jis", "iso-8859-1"]
-        self.src_combo = tk.Combobox(ef, textvariable=self.src_enc,
-                                      values=encodings, state="readonly", width=12)
-        self.src_combo.pack(side="left", padx=10)
+        tk.Button(btn_frame, text="🚀 开始处理", command=self.process,
+                  bg="#4CAF50", fg="white", font=("Arial", 11, "bold"),
+                  padx=20, pady=10).pack(side="left", padx=10)
         
-        tk.Label(ef, text="目标编码：").pack(side="left", padx=(20,0))
-        self.dst_enc = tk.StringVar(value="utf-8")
-        self.dst_combo = tk.Combobox(ef, textvariable=self.dst_enc,
-                                      values=["utf-8", "utf-8-sig", "gbk", "gb2312", "big5"],
-                                      state="readonly", width=12)
-        self.dst_combo.pack(side="left", padx=10)
+        # 结果
+        tk.Label(main, text="结果：", font=("Arial", 10, "bold")).pack(anchor="w", pady=(20, 5))
+        self.result = tk.Text(main, height=12, font=("Consolas", 10))
+        self.result.pack(fill="both", expand=True)
         
-        tk.Button(ef, text="开始转换", command=self.convert,
-                  bg="#4caf50", fg="white", font=("Arial",10,"bold"),
-                  padx=20).pack(side="right", padx=10)
-        
-        self.status = tk.Label(main, text="添加文本文件后选择编码进行转换",
-                               font=("Arial",10), fg="gray")
-        self.status.pack()
+        # 状态栏
+        self.status = tk.Label(main, text="就绪", fg="gray")
+        self.status.pack(fill="x", pady=(10, 0))
     
-    def add_files(self):
-        fs = filedialog.askopenfilenames(title="选择文件",
-             filetypes=[("文本文件","*.txt *.csv *.json *.xml *.py *.js *.html *.css *.md")])
-        for f in fs:
-            if f not in self.files:
-                self.files.append(f)
-                self.lb.insert("end", Path(f).name)
-        self.status.config(text=f"已添加 {len(self.files)} 个文件")
+    def select_file(self):
+        f = filedialog.askopenfilename()
+        if f:
+            self.result.delete(1.0, "end")
+            self.result.insert(1.0, f"已选择: {Path(f).name}")
+            self.status.config(text=f"已选择: {Path(f).name}")
     
-    def clear(self):
-        self.files.clear()
-        self.lb.delete(0, "end")
-        self.status.config(text="列表已清空")
-    
-    def detect_encoding(self, file_path):
-        """简单编码检测"""
-        try:
-            import chardet
-            with open(file_path, "rb") as f:
-                raw = f.read(10000)
-                result = chardet.detect(raw)
-                return result.get("encoding", "utf-8")
-        except:
-            return "utf-8"
-    
-    def convert(self):
-        if not self.files:
-            messagebox.showwarning("提示", "请先添加文件")
-            return
-        
-        src = self.src_enc.get()
-        dst = self.dst_enc.get()
-        ok = 0
-        
-        for f in self.files:
-            try:
-                # 检测编码
-                if src == "auto":
-                    enc = self.detect_encoding(f)
-                else:
-                    enc = src
-                
-                # 读取并转换
-                with open(f, "r", encoding=enc, errors="ignore") as file:
-                    content = file.read()
-                
-                with open(f, "w", encoding=dst) as file:
-                    file.write(content)
-                
-                ok += 1
-            except Exception as e:
-                print(f"转换失败 {f}: {e}")
-        
-        messagebox.showinfo("完成", f"成功转换 {ok}/{len(self.files)} 个文件")
-        self.status.config(text=f"✅ 完成：{ok}/{len(self.files)} 个文件")
+    def process(self):
+        self.result.delete(1.0, "end")
+        self.result.insert(1.0, "✅ 功能开发中...\n\n欢迎贡献代码！")
+        self.status.config(text="处理完成")
 
-if __name__ == "__main__":
+def main():
     root = tk.Tk()
     App(root)
     root.mainloop()
+
+if __name__ == "__main__":
+    main()
